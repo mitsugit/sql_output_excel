@@ -1,0 +1,123 @@
+    Dim syoribi_start As String
+    Dim syoribi_end As String
+    
+    Dim settingsSheet As Worksheet
+    Dim outputSheet As Worksheet
+
+Sub SettingSheets()
+    ' シート設定
+    
+    Set settingsSheet = ThisWorkbook.Sheets("設定シート")
+    Set outputSheet = ThisWorkbook.Sheets("出力先")
+
+End Sub
+
+
+Function ValidateDate(syoribi_start As String, syoribi_end As String) As Boolean
+    ' 日付確認
+
+    If syoribi_start = "" Or syoribi_end = "" Then
+        MsgBox "処理開始日と処理終了日の両方を指定してください"
+        ValidateDate = False
+        Exit Function
+    End If
+    
+    If syoribi_end < syoribi_start Then
+        MsgBox "処理終了日が処理開始日よりも小さいです。"
+        ValidateDate = False
+        Exit Function
+    End If
+    
+    ValidateDate = True
+    
+
+End Function
+
+
+
+
+Sub OutputSql_script()
+        
+    Call SettingSheets
+    
+    Call ClearValues
+    
+    ' 設定シートから変数を取得
+    syoribi_start = settingsSheet.Range("A2").Value
+    syoribi_start = Format(syoribi_start, "yyyy-mm-dd")
+    
+    syoribi_end = settingsSheet.Range("B2").Value
+    syoribi_end = Format(syoribi_end, "yyyy-mm-dd")
+    
+    
+    '日付のバリエーション
+    If Not ValidateDate(syoribi_start, syoribi_end) Then
+    Exit Sub
+    End If
+    
+
+    ' SQLスクリプトを文字列として定義
+    Dim sql_script As String
+    sql_script = "DO $$" & vbNewLine _
+                 & "DECLARE" & vbNewLine _
+                 & "  syoribi_start DATE := '" & syoribi_start & "';" & vbNewLine _
+                 & "  syoribi_end DATE := '" & syoribi_end & "';" & vbNewLine _
+                 & "  rows_deleted_b INT := 0;" & vbNewLine _
+                 & "  rows_deleted_a INT := 0;" & vbNewLine _
+                 & "  rows_deleted_c INT := 0;" & vbNewLine _
+                 & "BEGIN" & vbNewLine _
+                 & "  DELETE FROM B WHERE syoribi BETWEEN '" & syoribi_start & "' and '" & syoribi_end & "';" & vbNewLine _
+                 & "  GET DIAGNOSTICS rows_deleted_b = ROW_COUNT;" & vbNewLine _
+                 & vbNewLine _
+                 & "  DELETE FROM B WHERE syoribi BETWEEN '" & syoribi_start & "' and '" & syoribi_end & "';" & vbNewLine _
+                 & "  GET DIAGNOSTICS rows_deleted_a = ROW_COUNT;" & vbNewLine _
+                 & vbNewLine _
+                 & "  DELETE FROM B WHERE syoribi BETWEEN '" & syoribi_start & "' and '" & syoribi_end & "';" & vbNewLine _
+                 & "  GET DIAGNOSTICS rows_deleted_c = ROW_COUNT;" & vbNewLine _
+                 & vbNewLine _
+                 & "  RAISE info 'B 削除レコード数: %, A 削除レコード数: %, C 削除レコード数: % ', rows_deleted_b, rows_deleted_a, rows_deleted_c;" & vbNewLine _
+                 & vbNewLine _
+                 & "EXCEPTION" & vbNewLine _
+                 & "  WHEN others THEN" & vbNewLine _
+                 & "    RAISE EXCEPTION 'エラーが発生しました: %', SQLERRM;" & vbNewLine _
+                 & "END;" & vbNewLine _
+                 & "$$;"
+
+    outputSheet.Range("A2").Value = sql_script
+    
+    ' メッセージを表示
+    MsgBox "処理日: " & syoribi_start & "から" & syoribi_end & " の削除用SQLを出力先シートに発行しました。", vbInformation, "SQL 発行完了"
+    
+    ' 設定シートに戻る
+    settingsSheet.Activate
+    
+    ' 出力先シートに移動
+    outputSheet.Activate
+    
+
+End Sub
+
+Sub CopyToClipBoard()
+    'データのクリップボード貼り付け
+    
+    Dim buf As String, buf2 As String, CB As New DataObject
+    buf = Range("A2").Value
+    With CB
+        .SetText buf        ''変数のデータをDataObjectに格納する
+        .PutInClipboard     ''DataObjectのデータをクリップボードに格納する
+    End With
+    MsgBox "データをクリップボードに格納しました"
+End Sub
+
+
+
+Sub ClearValues()
+    
+    'データクリア
+    Call SettingSheets
+    outputSheet.Range("A2").ClearContents
+    
+    
+End Sub
+
+
